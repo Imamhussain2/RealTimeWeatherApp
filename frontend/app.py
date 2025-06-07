@@ -3,7 +3,7 @@ import requests
 import pandas as pd
 import plotly.express as px
 
-API_URL = "https://realtimeweatherapp-frontend.onrender.com/run"  # Update this after Render deploy
+API_URL = "https://realtimeweatherapp-8ow1.onrender.com/run"  # Update this after Render deploy
 
 st.set_page_config(page_title="Weather Dashboard", layout="wide")
 st.title("🌦️ Real-Time Weather Monitoring Dashboard")
