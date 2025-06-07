@@ -4,6 +4,9 @@ import logging
 import os
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import pandas as pd
+import joblib
 
 app = FastAPI()
 
@@ -20,6 +23,19 @@ API_KEY = os.getenv("API_KEY", "e14afbb524e1dd6656dc7ac8eb3b09df")
 CITY_LIST = ['ahmedabad', 'assam', 'bengaluru', 'chennai', 'delhi', 'kolkata', 'mumbai', 'panaji', 'pune', 'shimla']
 
 logging.basicConfig(level=logging.INFO)
+
+# Load ML model
+MODEL_PATH = "model.pkl"  # Ensure this model exists in the same directory
+try:
+    model = joblib.load(MODEL_PATH)
+    logging.info("✅ ML model loaded successfully.")
+except Exception as e:
+    logging.error(f"❌ Failed to load ML model: {e}")
+    model = None
+
+class WeatherInput(BaseModel):
+    city: str
+    humidity: float
 
 def get_weather_data(city: str):
     url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}"
@@ -48,7 +64,6 @@ def process_weather_data(data):
 def read_root():
     return {"message": "✅ FastAPI backend is live. Use /run to fetch weather data."}
 
-
 @app.get("/run")
 def run_pipeline():
     results: List[dict] = []
@@ -63,3 +78,16 @@ def run_pipeline():
         "message": "Weather pipeline completed successfully.",
         "results": results
     }
+
+@app.post("/predict")
+def predict_temperature(data: WeatherInput):
+    if model is None:
+        return {"error": "ML model not loaded"}
+    try:
+        input_df = pd.DataFrame([data.dict()])
+        input_df = pd.get_dummies(input_df).reindex(columns=model.feature_names_in_, fill_value=0)
+        prediction = model.predict(input_df)[0]
+        return {"predicted_temperature": round(prediction, 2)}
+    except Exception as e:
+        logging.error(f"❌ Prediction error: {e}")
+        return {"error": str(e)}
