@@ -2,116 +2,148 @@ import streamlit as st
 import requests
 import pandas as pd
 import plotly.express as px
+from datetime import datetime
 
-API_URL = "https://realtimeweatherapp-8ow1.onrender.com/run"         # Your backend endpoint for weather data
-PREDICT_URL = "https://realtimeweatherapp-8ow1.onrender.com/predict" # Your backend endpoint for prediction
+API_URL = "https://realtimeweatherapp-8ow1.onrender.com/run"
+PREDICT_URL = "https://realtimeweatherapp-8ow1.onrender.com/predict"
 
-st.set_page_config(page_title="Weather Dashboard with ML Predictions", layout="wide")
-st.title("🌦️ Real-Time Weather Monitoring & Temperature Prediction Dashboard")
+st.set_page_config(page_title="🌤️ Real-Time Weather Dashboard", layout="wide")
+st.title("🌍 Real-Time Weather Monitoring & ML-based Temperature Prediction")
 
-# ======== Fetch and display real-time weather data ========
-if st.button("Fetch Weather Data"):
-    with st.spinner("Getting latest weather info..."):
-        res = requests.get(API_URL)
-        if res.status_code == 200:
-            data = res.json()['results']
-            df = pd.DataFrame(data)
-
-            st.subheader("📋 Raw Weather Data")
-            st.dataframe(df)
-
-            # Summary statistics
-            st.subheader("📊 Summary Statistics")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Avg Temperature (°C)", round(df['temperature_celsius'].mean(), 2))
-                st.metric("Max Temperature (°C)", df['temperature_celsius'].max())
-                st.metric("Min Temperature (°C)", df['temperature_celsius'].min())
-            with col2:
-                st.metric("Avg Humidity (%)", round(df['humidity'].mean(), 2))
-                st.metric("Max Humidity (%)", df['humidity'].max())
-                st.metric("Min Humidity (%)", df['humidity'].min())
-
-            # Hottest and coldest cities
-            hottest = df.loc[df['temperature_celsius'].idxmax()]
-            coldest = df.loc[df['temperature_celsius'].idxmin()]
-            st.info(f"🔥 Hottest City: {hottest['city']} ({hottest['temperature_celsius']}°C)")
-            st.info(f"❄️ Coldest City: {coldest['city']} ({coldest['temperature_celsius']}°C)")
-
-            # Temperature Bar Chart
-            st.subheader("🌡️ Temperature by City (°C)")
-            fig1 = px.bar(df, x="city", y="temperature_celsius", color="temperature_celsius", text="temperature_celsius",
-                          color_continuous_scale='thermal')
-            st.plotly_chart(fig1, use_container_width=True)
-
-            # Humidity Line Chart
-            st.subheader("💧 Humidity by City (%)")
-            fig2 = px.line(df, x="city", y="humidity", markers=True, color_discrete_sequence=['blue'])
-            st.plotly_chart(fig2, use_container_width=True)
-
-            # Humidity vs Temperature Scatter
-            st.subheader("🔁 Temperature vs Humidity")
-            fig3 = px.scatter(df, x="temperature_celsius", y="humidity", color="city", size="humidity", hover_name="city",
-                              color_continuous_scale=px.colors.sequential.Viridis)
-            st.plotly_chart(fig3, use_container_width=True)
-
-            # Weather type distribution
-            st.subheader("🌥️ Weather Type Distribution")
-            fig4 = px.pie(df, names="weather", title="Current Weather Conditions", color_discrete_sequence=px.colors.qualitative.Set3)
-            st.plotly_chart(fig4, use_container_width=True)
-
-            # Interactive Temperature Range Filter
-            st.subheader("🎛️ Filter by Temperature Range")
-            min_temp, max_temp = float(df['temperature_celsius'].min()), float(df['temperature_celsius'].max())
-            temp_range = st.slider("Select Temperature Range (°C)", min_value=min_temp, max_value=max_temp, value=(min_temp, max_temp))
-            filtered_df = df[(df['temperature_celsius'] >= temp_range[0]) & (df['temperature_celsius'] <= temp_range[1])]
-            st.dataframe(filtered_df)
-
+# ===== Fetch and preprocess weather data =====
+def fetch_data():
+    try:
+        response = requests.get(API_URL)
+        if response.status_code == 200:
+            data = response.json()['results']
+            df = pd.json_normalize(data)
+            df.rename(columns={
+                "city": "City",
+                "temperature_celsius": "Temperature (°C)",
+                "feels_like_celsius": "Feels Like (°C)",
+                "temp_min_celsius": "Min Temp (°C)",
+                "temp_max_celsius": "Max Temp (°C)",
+                "pressure_hpa": "Pressure (hPa)",
+                "humidity_percent": "Humidity (%)",
+                "wind.speed_m_s": "Wind Speed (m/s)",
+                "wind.direction_deg": "Wind Dir (°)",
+                "wind.gust_m_s": "Wind Gust (m/s)",
+                "clouds_percent": "Clouds (%)",
+                "weather.main": "Weather",
+                "weather.description": "Weather Description",
+                "sunrise_local": "Sunrise",
+                "sunset_local": "Sunset",
+                "timestamp_local": "Data Time",
+                "country": "Country"
+            }, inplace=True)
+            return df
         else:
-            st.error("❌ Failed to fetch data from the backend.")
+            st.error("❌ API Error: Could not retrieve data.")
+            return None
+    except Exception as e:
+        st.error(f"❌ Exception: {e}")
+        return None
 
-st.markdown("---")
+# Convert Unix to formatted time if needed
+def format_time(unixts):
+    return datetime.fromtimestamp(unixts).strftime("%H:%M:%S")
 
-# ======== ML Prediction Section ========
-st.subheader("🤖 Predict Temperature Based on City, Humidity & Weather")
+# ===== UI Tabs =====
+tab1, tab2 = st.tabs(["📊 Weather Analytics", "🤖 ML Prediction"])
 
-# Possible weather conditions from your dataset (you can adjust this list if needed)
-weather_options = [
-    "clear sky", "few clouds", "scattered clouds", "broken clouds",
-    "shower rain", "rain", "thunderstorm", "snow", "mist"
-]
+# ============ TAB 1: ANALYTICS ============
+with tab1:
+    st.subheader("📡 Current Weather Stats Across Major Cities")
 
-with st.form(key='prediction_form'):
-    col1, col2, col3 = st.columns(3)
+    if st.button("📥 Load Weather Data"):
+        df = fetch_data()
+        if df is not None:
+            st.success("✅ Data successfully loaded!")
+            with st.expander("🔍 Raw Weather Data"):
+                st.dataframe(df)
 
-    with col1:
-        city_input = st.selectbox("Select City", options=[
-            'ahmedabad', 'assam', 'bengaluru', 'chennai', 'delhi',
-            'kolkata', 'mumbai', 'panaji', 'pune', 'shimla'
-        ])
+            # Summary Metrics
+            col1, col2, col3 = st.columns(3)
+            col1.metric("🌡️ Avg Temp (°C)", round(df["Temperature (°C)"].mean(), 1))
+            col2.metric("💧 Avg Humidity (%)", round(df["Humidity (%)"].mean(), 1))
+            col3.metric("🍃 Avg Wind Speed (m/s)", round(df["Wind Speed (m/s)"].mean(), 1))
 
-    with col2:
-        humidity_input = st.slider("Humidity (%)", min_value=0, max_value=100, value=50)
+            # ========== Charts ==========
+            st.markdown("### 🔥 Temperature Analysis")
+            temp_col1, temp_col2 = st.columns(2)
+            with temp_col1:
+                fig_temp = px.bar(df, x="City", y="Temperature (°C)", color="Temperature (°C)",
+                                  text="Temperature (°C)", color_continuous_scale='thermal')
+                st.plotly_chart(fig_temp, use_container_width=True)
 
-    with col3:
-        weather_input = st.selectbox("Weather Condition", options=weather_options)
+            with temp_col2:
+                fig_feels = px.bar(df, x="City", y="Feels Like (°C)", color="Feels Like (°C)",
+                                   text="Feels Like (°C)", color_continuous_scale='plasma')
+                st.plotly_chart(fig_feels, use_container_width=True)
 
-    submit_btn = st.form_submit_button(label='Predict Temperature')
+            st.markdown("### 💨 Wind & Clouds Overview")
+            wind_col1, wind_col2 = st.columns(2)
+            with wind_col1:
+                fig_wind = px.bar(df, x="City", y="Wind Speed (m/s)", color="Wind Speed (m/s)",
+                                  text="Wind Speed (m/s)", color_continuous_scale='blues')
+                st.plotly_chart(fig_wind, use_container_width=True)
 
-if submit_btn:
-    payload = {
-        "city": city_input,
-        "humidity": humidity_input,
-        "weather": weather_input
-    }
+            with wind_col2:
+                fig_clouds = px.bar(df, x="City", y="Clouds (%)", color="Clouds (%)",
+                                    text="Clouds (%)", color_continuous_scale='gray')
+                st.plotly_chart(fig_clouds, use_container_width=True)
 
-    with st.spinner("Predicting temperature..."):
-        try:
-            response = requests.post(PREDICT_URL, json=payload)
-            if response.status_code == 200:
-                predicted_temp = response.json().get("predicted_temperature_celsius")
-                st.success(f"🌡️ Predicted Temperature: {predicted_temp:.2f} °C")
-            else:
-                st.error(f"Prediction failed with status code {response.status_code}. Please try again.")
-        except Exception as e:
-            st.error(f"Error during prediction: {e}")
+            st.markdown("### 🌅 Sunrise & Sunset Times")
+            df["Sunrise"] = pd.to_datetime(df["Sunrise"])
+            df["Sunset"] = pd.to_datetime(df["Sunset"])
+            time_df = df[["City", "Sunrise", "Sunset"]]
+            st.dataframe(time_df)
+
+            st.markdown("### 🌈 Weather Distribution")
+            fig_pie = px.pie(df, names="Weather Description", title="Weather Types",
+                             color_discrete_sequence=px.colors.qualitative.Bold)
+            st.plotly_chart(fig_pie, use_container_width=True)
+
+            st.markdown("### 🔁 Temperature vs Humidity Scatter")
+            fig_scatter = px.scatter(df, x="Temperature (°C)", y="Humidity (%)", color="City",
+                                     size="Wind Speed (m/s)", hover_name="City",
+                                     color_discrete_sequence=px.colors.qualitative.Set1)
+            st.plotly_chart(fig_scatter, use_container_width=True)
+
+# ============ TAB 2: PREDICTION ============
+with tab2:
+    st.subheader("🔮 Predict Temperature with ML Model")
+    with st.form("prediction_form"):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            city = st.selectbox("Select City", [
+                'ahmedabad', 'assam', 'bengaluru', 'chennai', 'delhi',
+                'kolkata', 'mumbai', 'panaji', 'pune', 'shimla'
+            ])
+        with col2:
+            humidity = st.slider("Humidity (%)", 0, 100, 50)
+        with col3:
+            weather = st.selectbox("Weather Condition", [
+                "clear sky", "few clouds", "scattered clouds", "broken clouds",
+                "shower rain", "rain", "thunderstorm", "snow", "mist"
+            ])
+
+        submit = st.form_submit_button("🚀 Predict Temperature")
+
+    if submit:
+        payload = {
+            "city": city,
+            "humidity": humidity,
+            "weather": weather
+        }
+
+        with st.spinner("Making prediction..."):
+            try:
+                res = requests.post(PREDICT_URL, json=payload)
+                if res.status_code == 200:
+                    temp = res.json().get("predicted_temperature")
+                    st.success(f"🌡️ Predicted Temperature: {temp:.2f} °C")
+                else:
+                    st.error(f"Error: {res.status_code}")
+            except Exception as e:
+                st.error(f"❌ Prediction Failed: {e}")
