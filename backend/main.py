@@ -44,6 +44,11 @@ def process_weather_data(data):
         "weather": data["weather"][0]["description"]
     }
 
+@app.get("/")
+def read_root():
+    return {"message": "✅ FastAPI backend is live. Use /run to fetch weather data."}
+
+
 @app.get("/run")
 def run_pipeline():
     results: List[dict] = []
