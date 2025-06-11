@@ -107,9 +107,21 @@ with tab1:
 
             # Wind Rose (Polar plot)
             st.markdown("### 🧭 Wind Direction Intensity")
-            fig_polar = px.bar_polar(df, r="Wind Speed (m/s)", theta="Wind Dir (°)",
-                                     color="City", template="plotly_dark", opacity=0.8)
-            st.plotly_chart(fig_polar, use_container_width=True)
+            df_polar = df[["Wind Speed (m/s)", "Wind Dir (°)", "City"]].dropna()
+
+            # Ensure numeric values and filter out bad data
+            df_polar = df_polar[pd.to_numeric(df_polar["Wind Dir (°)"], errors="coerce").notnull()]
+            df_polar = df_polar[pd.to_numeric(df_polar["Wind Speed (m/s)"], errors="coerce").notnull()]
+            df_polar["Wind Dir (°)"] = df_polar["Wind Dir (°)"].astype(float)
+            df_polar["Wind Speed (m/s)"] = df_polar["Wind Speed (m/s)"].astype(float)
+
+            if df_polar.empty:
+                st.warning("⚠️ Not enough data to render wind rose chart.")
+            else:
+                fig_polar = px.bar_polar(df_polar, r="Wind Speed (m/s)", theta="Wind Dir (°)",
+                                 color="City", template="plotly_dark", opacity=0.8)
+                st.plotly_chart(fig_polar, use_container_width=True)
+
 
             # Country-level weather
             st.markdown("### 🌍 Country-wise Weather Summary")
