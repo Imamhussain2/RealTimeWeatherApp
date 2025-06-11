@@ -21,12 +21,14 @@ app.add_middleware(
 )
 
 API_KEY = os.getenv("API_KEY", "e14afbb524e1dd6656dc7ac8eb3b09df")
-CITY_LIST = ['ahmedabad', 'assam', 'bengaluru', 'chennai', 'delhi', 'kolkata', 'mumbai', 'panaji', 'pune', 'shimla']
+CITY_LIST = ['ahmedabad', 'assam', 'bengaluru', 'chennai', 'delhi', 'hyderabad',
+             'jaipur', 'kolkata', 'lucknow', 'mumbai', 'panaji', 'pune', 'shimla',
+             'srinagar', 'thiruvananthapuram']
 
 logging.basicConfig(level=logging.INFO)
 
 # Load ML model
-MODEL_PATH = "model.pkl"  # Ensure this model exists in the same directory
+MODEL_PATH = "model.pkl"
 try:
     model = joblib.load(MODEL_PATH)
     logging.info("✅ ML model loaded successfully.")
@@ -37,9 +39,9 @@ except Exception as e:
 class WeatherInput(BaseModel):
     city: str
     humidity: float
+    temperature_celsius: float
 
 def unix_to_local_time(unix_time, tz_offset_seconds):
-    """Convert unix timestamp to local datetime string with timezone offset"""
     if unix_time == 0:
         return None
     local_dt = datetime.datetime.utcfromtimestamp(unix_time + tz_offset_seconds)
@@ -62,7 +64,6 @@ def get_weather_data(city: str):
 def process_weather_data(data):
     if not data:
         return None
-
     main = data.get("main", {})
     wind = data.get("wind", {})
     clouds = data.get("clouds", {})
@@ -74,26 +75,15 @@ def process_weather_data(data):
 
     return {
         "city": data.get("name"),
-        "coordinates": {
-            "lon": coord.get("lon"),
-            "lat": coord.get("lat"),
-        },
-        "weather": {
-            "main": weather.get("main"),
-            "description": weather.get("description"),
-            "icon": weather.get("icon"),
-        },
+        "coordinates": {"lon": coord.get("lon"), "lat": coord.get("lat")},
+        "weather": {"main": weather.get("main"), "description": weather.get("description"), "icon": weather.get("icon")},
         "temperature_celsius": round(main.get("temp", 0) - 273.15, 2),
         "feels_like_celsius": round(main.get("feels_like", 0) - 273.15, 2),
         "temp_min_celsius": round(main.get("temp_min", 0) - 273.15, 2),
         "temp_max_celsius": round(main.get("temp_max", 0) - 273.15, 2),
         "pressure_hpa": main.get("pressure"),
         "humidity_percent": main.get("humidity"),
-        "wind": {
-            "speed_m_s": wind.get("speed"),
-            "direction_deg": wind.get("deg"),
-            "gust_m_s": wind.get("gust"),
-        },
+        "wind": {"speed_m_s": wind.get("speed"), "direction_deg": wind.get("deg"), "gust_m_s": wind.get("gust")},
         "clouds_percent": clouds.get("all"),
         "sunrise_local": unix_to_local_time(sys.get("sunrise", 0), timezone_offset),
         "sunset_local": unix_to_local_time(sys.get("sunset", 0), timezone_offset),
@@ -114,23 +104,17 @@ def run_pipeline():
         processed = process_weather_data(raw)
         if processed:
             results.append(processed)
-
     logging.info("✅ Pipeline completed")
-    return {
-        "message": "Weather pipeline completed successfully.",
-        "results": results
-    }
+    return {"message": "Weather pipeline completed successfully.", "results": results}
 
 @app.post("/predict")
-def predict_temperature(data: WeatherInput):
+def predict_weather_condition(data: WeatherInput):
     if model is None:
         return {"error": "ML model not loaded"}
     try:
         input_df = pd.DataFrame([data.dict()])
-        # Ensure the input dataframe columns match the model's features
-        input_df = pd.get_dummies(input_df).reindex(columns=model.feature_names_in_, fill_value=0)
         prediction = model.predict(input_df)[0]
-        return {"predicted_temperature": round(prediction, 2)}
+        return {"predicted_weather_condition": prediction}
     except Exception as e:
         logging.error(f"❌ Prediction error: {e}")
         return {"error": str(e)}
