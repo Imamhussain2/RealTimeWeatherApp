@@ -20,7 +20,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-API_KEY = os.getenv("API_KEY", "e14afbb524e1dd6656dc7ac8eb3b09df")
+API_KEY = "e14afbb524e1dd6656dc7ac8eb3b09df"
 CITY_LIST = ['ahmedabad', 'assam', 'bengaluru', 'chennai', 'delhi', 'hyderabad',
              'jaipur', 'kolkata', 'lucknow', 'mumbai', 'panaji', 'pune', 'shimla',
              'srinagar', 'thiruvananthapuram']
