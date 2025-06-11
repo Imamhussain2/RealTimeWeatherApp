@@ -69,11 +69,6 @@ with tab1:
             # Convert time column for plots
             df["Data Time"] = pd.to_datetime(df["Data Time"])
 
-            # Temperature Line Chart
-            st.markdown("### 🕒 Temperature Trends")
-            fig_line = px.line(df.sort_values("Data Time"), x="Data Time", y="Temperature (°C)", color="City")
-            st.plotly_chart(fig_line, use_container_width=True)
-
             # Temperature Analysis
             st.markdown("### 🔥 Temperature Analysis")
             fig_temp = px.bar(df, x="City", y="Temperature (°C)", color="Temperature (°C)",
@@ -119,7 +114,7 @@ with tab1:
                 st.warning("⚠️ Not enough data to render wind rose chart.")
             else:
                 fig_polar = px.bar_polar(df_polar, r="Wind Speed (m/s)", theta="Wind Dir (°)",
-                                 color="City", template="plotly_dark", opacity=0.8)
+                                 color="City", template="plotly_dark")
                 st.plotly_chart(fig_polar, use_container_width=True)
 
 
